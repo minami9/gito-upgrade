@@ -12,9 +12,6 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    connect(&p, &QProcess::started, this, [=](){
-        QCoreApplication::exit(0);
-    });
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -38,21 +35,25 @@ void MainWindow::doUpgrade(const QUrl &url)
     req.setRawHeader("Accept-Language", "zh-CN,en-US;q=0.8");
 
     mFileName = url.fileName();
-    mRecvSize = 0;
+
     QSslConfiguration sslConfig;
     sslConfig.setPeerVerifyMode(QSslSocket::VerifyNone);
     sslConfig.setProtocol(QSsl::TlsV1SslV3);   //具体以OpenSSL版本为准
     req.setSslConfiguration(sslConfig);
 
     QNetworkReply *reply = mNetMgr.get(req);
+
     mTargetFile.setFileName(QCoreApplication::applicationDirPath() + "/" + mFileName);
-    if (!mTargetFile.open(QFile::ReadWrite)) {
-        QMessageBox::information(this, QString::fromLocal8Bit("gito-nikki更新"),
-                                 QString::fromLocal8Bit("更新失败，因为找不到当前的gito-nikki可执行文件。"));
-        return;
-    }
-    mTargetFile.resize(0);
-    connect(reply, &QNetworkReply::readyRead, this, [=](){
+
+    connect(reply, &QNetworkReply::readyRead, this, [=]() {
+        if (!mTargetFile.isOpen()) {
+            if (!mTargetFile.open(QFile::ReadWrite)) {
+                QMessageBox::information(this, QString::fromLocal8Bit("gito-nikki更新"),
+                                         QString::fromLocal8Bit("更新失败，因为找不到当前的gito-nikki可执行文件。") + mTargetFile.fileName());
+                return;
+            }
+            mTargetFile.resize(0);
+        }
         QNetworkReply *reply = static_cast<QNetworkReply *>(sender());
         if (!reply)
             return;
@@ -67,7 +68,10 @@ void MainWindow::doUpgrade(const QUrl &url)
     connect(reply, &QNetworkReply::finished, this, [=](){
         mTargetFile.close();
         p.setProgram(QCoreApplication::applicationDirPath() + "/" + mFileName);
-        p.start();
+        p.startDetached();
+
+
+        QCoreApplication::exit(0);
     });
     connect(reply,
             static_cast<void (QNetworkReply::*)(QNetworkReply::NetworkError)>(&QNetworkReply::error),
