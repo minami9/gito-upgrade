@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>res/icons/Phoenix_32x32.ico</file>
+        <file>res/icons/Phoenix.ico</file>
+    </qresource>
+</RCC>
